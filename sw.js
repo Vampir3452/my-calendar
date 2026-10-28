@@ -1,5 +1,5 @@
 // Only the public application shell is cached. Account data lives in IndexedDB.
-const VERSION = '1b972d493535';
+const VERSION = 'dev-v6';
 const DEVELOPMENT = ['localhost', '127.0.0.1'].includes(self.location.hostname);
 const SCOPE = new URL(self.registration.scope).pathname;
 const CACHE_PREFIX = `zk-shell:${SCOPE}:`;
