@@ -440,12 +440,32 @@ async function confirmRestore() {
 function chooseTemplate() {
   modal('Шаблон мероприятия', `<p>Вопросы и задачи добавятся к текущим. Заполненные ответы и отметки сохранятся.</p><div class="template-grid compact">${templates().map(t => `<button class="template-tile" data-action="apply-template" data-id="${esc(t.id)}"><h3>${esc(t.payload.name)}</h3><p>${t.payload.questions.length} вопросов · ${t.payload.tasks.length} задач</p></button>`).join('')}<button class="template-tile" data-action="no-template"><h3>Другое</h3><p>Без шаблона</p></button></div>`);
 }
+function conflictSummary(localPayload, remotePayload, kind) {
+  if (!remotePayload) return 'Облачная версия отсутствует; на устройстве есть сохранённая запись.';
+  if (!localPayload) return 'На устройстве записи нет; в облаке сохранена отдельная версия.';
+  const changes = [];
+  const labels = { name:'название шаблона', category:'тип события', templateId:'шаблон', description:'описание мероприятия', descriptionHtml:'оформление описания', questionnaires:'анкеты', scriptUrl:'ссылка на сценарий', venue:'место', totalCost:'стоимость', prepayment:'предоплата', team:'состав команды', 'source.title':'название в календаре', 'source.start':'дата и время', 'source.end':'время окончания', 'source.location':'место в календаре', 'source.status':'статус в календаре', 'source.calendarDescription':'описание из Google Календаря' };
+  const same = (a,b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  const collectList = (before, after, name) => {
+    const left=Array.isArray(before)?before:[], right=Array.isArray(after)?after:[];
+    const li=new Map(left.map(x=>[x.id,x])), ri=new Map(right.map(x=>[x.id,x]));
+    const added=right.filter(x=>!li.has(x.id)), removed=left.filter(x=>!ri.has(x.id)), changed=right.filter(x=>li.has(x.id)&&!same(li.get(x.id),x));
+    const examples=xs=>xs.slice(0,2).map(x=>'«'+String(x.label||'без названия').slice(0,42)+'»').join(', ');
+    if(added.length) changes.push('добавлены '+name+' '+examples(added)+(added.length>2?' и ещё '+(added.length-2):''));
+    if(removed.length) changes.push('удалены '+name+' '+examples(removed)+(removed.length>2?' и ещё '+(removed.length-2):''));
+    if(changed.length) changes.push('изменены пункты '+name+' ('+changed.length+')');
+  };
+  const compare=(left,right,prefix='')=>{ for(const key of new Set([...Object.keys(left||{}),...Object.keys(right||{})])) { if(['questions','tasks'].includes(key)){collectList(left?.[key],right?.[key],key==='tasks'?'задачи':'вопросы');continue;} if(!same(left?.[key],right?.[key])) changes.push(labels[prefix+key]||labels[key]||key); } };
+  if(kind==='event'){compare(localPayload?.body,remotePayload?.body);compare(localPayload?.source,remotePayload?.source,'source.');} else compare(localPayload,remotePayload);
+  const unique=[...new Set(changes)];
+  return unique.length?'Различия: '+unique.slice(0,5).join('; ')+(unique.length>5?'; ещё '+(unique.length-5):'')+'.':'Содержимое одинаковое; различаются только версии сохранения.';
+}
 function showConflicts() {
   const r = conflicts()[0];
   if (!r) { closeModal(); render(); return; }
   const title = r.kind === 'event' ? cleanTitle(r.payload.source.title) : r.payload.name;
-  const readable = payload => r.kind === 'event' ? JSON.stringify({ ...payload.body, calendar: payload.source }, null, 2) : JSON.stringify(payload, null, 2);
-  modal('Выбери версию записи', `<p><strong>${esc(title)}</strong></p><p>Обе версии сохранены. Перед выбором можно скачать резервную копию и скопировать нужные фрагменты.</p><div class="conflict-preview"><div><h3>На этом устройстве</h3><pre>${esc(readable(r.payload))}</pre></div><div><h3>В облаке</h3><pre>${r.conflict.payload ? esc(readable(r.conflict.payload)) : 'Запись отсутствует'}</pre></div></div>`, `${button('backup', 'Скачать обе версии', 'download', 'ghost')}${button('resolve-remote', 'Оставить облачную', '', 'secondary', `data-id="${esc(r.id)}" ${!r.conflict.payload ? 'disabled' : ''}`)}${button('resolve-local', 'Оставить эту', '', 'primary', `data-id="${esc(r.id)}"`)}`, true);
+  const summary = conflictSummary(r.payload, r.conflict.payload, r.kind);
+  modal('Выбери версию записи', `<p><strong>${esc(title)}</strong></p><p class="conflict-summary">${esc(summary)}</p>`, `${button('backup', 'Скачать обе версии', 'download', 'ghost')}${button('resolve-remote', 'Оставить облачную', '', 'secondary', `data-id="${esc(r.id)}" ${!r.conflict.payload ? 'disabled' : ''}`)}${button('resolve-local', 'Оставить эту', '', 'primary', `data-id="${esc(r.id)}"`)}`, true);
 }
 async function resolveConflict(id, useLocal) {
   const r = record(id); if (!r?.conflict) return;
