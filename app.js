@@ -4,7 +4,7 @@ import * as api from './lib/api.js';
 import { parseTaskFile, downloadTaskWorkbook } from './lib/task-import.js';
 import { renderRichEditor, wireRichEditors } from './lib/rich-text.js';
 import { recordChanges, describeDevice } from './lib/change-history.js';
-import { CATEGORIES, SCHEMA_VERSION, clone, sameContent, uid, item, createTemplate, clearTaskList, restoreTaskList, clearQuestionList, restoreQuestionList, discardRecoveredItems, replaceTemplateTasks, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
+import { CATEGORIES, SCHEMA_VERSION, clone, sameContent, uid, item, createTemplate, clearTaskList, restoreTaskList, clearQuestionList, restoreQuestionList, discardRecoveredItems, replaceTemplateTasks, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, seedCorporateTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
 
 const APP_VERSION = '0.4.16';
 const historyBaseline = new Map();
@@ -147,7 +147,7 @@ async function performSync(includeCalendar) {
     // cannot silently replace templates prepared elsewhere.
     for (const t of defaultTemplates()) if (!record(t.id)) { state.records.push(t); persist(t, false); }
     for (const local of templates()) {
-      const seeded = seedWeddingTemplate(local);
+      const seeded = seedWeddingTemplate(local) || seedCorporateTemplate(local);
       if (seeded) { Object.assign(local, seeded); persist(local, false); }
     }
     for (const local of state.records.filter(r => r.dirty && !r.conflict)) {
@@ -350,7 +350,7 @@ function renderChecklist(items, group, template = false) {
 function templatesView() {
   const t = current();
   if (t?.kind === 'template') return `<div class="page-heading"><div>${button('back-templates', 'Все шаблоны', 'back', 'ghost')}<h1>${esc(t.payload.name)}</h1></div>${button('delete-template','Удалить шаблон','trash','ghost',`data-id="${esc(t.id)}"`)}</div><div class="template-editor"><section class="panel">${field('Название шаблона', t.payload.name, 'template-name', { input: 'text' })}</section><section class="panel list-panel">${editorHeading('01', 'Вопросы для обсуждения', '')}${checklistTools('questions')}<div class="checklist">${renderChecklist(t.payload.questions, 'questions', true)}</div>${button('add-question', 'Добавить вопрос', 'plus', 'ghost')}</section><section class="panel list-panel">${editorHeading('02', 'Задачи подготовки', '')}${checklistTools('tasks')}<div class="checklist">${renderChecklist(t.payload.tasks, 'tasks', true)}</div>${button('add-task', 'Добавить задачу', 'plus', 'ghost')}</section></div>`;
-  return `<div class="page-heading"><div><h1>Твои шаблоны</h1></div></div>${button('new-template', 'Создать свой шаблон', 'plus', 'primary')}<div class="template-grid own-templates">${templates().map(r => `<button class="template-tile" data-action="open-template" data-id="${esc(r.id)}"><span class="template-icon">${icon(r.payload.category === 'wedding' ? 'heart' : r.payload.category === 'birthday' ? 'spark' : 'templates')}</span><h2>${esc(r.payload.name)}</h2><p>${r.payload.questions.length} вопросов · ${r.payload.tasks.length} задач</p><span class="template-count">Редактировать шаблон ${icon('arrow')}</span></button>`).join('')}</div>${deletedTemplatesView()}<div class="notice">${icon('note')}<p>Свадебный шаблон готов: вопросы для пары и отдельные задачи подготовки. Лишние пункты можно удалить, формулировки — изменить. «Другое» создаётся без шаблона; вопросы и задачи можно добавить вручную.</p></div>`;
+  return `<div class="page-heading"><div><h1>Твои шаблоны</h1></div></div>${button('new-template', 'Создать свой шаблон', 'plus', 'primary')}<div class="template-grid own-templates">${templates().map(r => `<button class="template-tile" data-action="open-template" data-id="${esc(r.id)}"><span class="template-icon">${icon(r.payload.category === 'wedding' ? 'heart' : r.payload.category === 'birthday' ? 'spark' : 'templates')}</span><h2>${esc(r.payload.name)}</h2><p>${r.payload.questions.length} вопросов · ${r.payload.tasks.length} задач</p><span class="template-count">Редактировать шаблон ${icon('arrow')}</span></button>`).join('')}</div>${deletedTemplatesView()}<div class="notice">${icon('note')}<p>Шаблоны содержат вопросы для обсуждения и задачи подготовки. Пункты можно изменить или удалить. «Другое» создаётся без шаблона.</p></div>`;
 }
 function deletedTemplatesView() {
   const removed = state.records.filter(r => r.kind === 'template' && r.payload.deletedAt);
@@ -387,7 +387,7 @@ async function enterDemo() {
   if (!state.records.length) { state.records = demoRecords(); await db.writeMany('demo', state.records); }
   rememberHistory(state.records);
   for (const local of templates()) {
-    const seeded = seedWeddingTemplate(local);
+    const seeded = seedWeddingTemplate(local) || seedCorporateTemplate(local);
     if (seeded) { Object.assign(local, seeded); persist(local, false); }
   }
   state.lastCalendar = null; state.cloudError = ''; state.calendarError = '';
