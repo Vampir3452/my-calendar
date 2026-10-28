@@ -6,7 +6,7 @@ import { renderRichEditor, wireRichEditors } from './lib/rich-text.js';
 import { recordChanges, describeDevice } from './lib/change-history.js';
 import { CATEGORIES, SCHEMA_VERSION, clone, sameContent, uid, item, createTemplate, clearTaskList, restoreTaskList, clearQuestionList, restoreQuestionList, discardRecoveredItems, replaceTemplateTasks, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, seedCorporateTemplate, seedBirthdayTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
 
-const APP_VERSION = '0.4.18';
+const APP_VERSION = '0.5.0';
 const historyBaseline = new Map();
 const device = (() => {
   try {
@@ -196,6 +196,52 @@ function shell() {
   const title = state.route === 'sheet' ? 'Динамичный лист' : state.route === 'changes' ? 'История изменений' : state.route === 'templates' ? 'Шаблоны' : state.route === 'settings' ? 'Настройки' : state.route === 'event' ? 'Мероприятия / Подготовка' : state.route === 'archive' ? 'История мероприятий' : 'Мероприятия';
   return `<div class="shell"><aside class="sidebar"><a class="brand" href="#calendar" data-action="navigate" data-route="calendar"><span class="brand-mark">LG</span><span class="brand-copy">Let’s Go!<small>Кабинет ведущего</small></span></a><nav class="nav" aria-label="Основная навигация">${navigation('calendar', 'Мероприятия', 'calendar')}${navigation('sheet', 'Динамичный лист', 'note')}${navigation('templates', 'Шаблоны', 'templates')}${navigation('archive', 'Архив', 'clock')}${navigation('changes', 'Изменения', 'note')}${navigation('settings', 'Настройки', 'settings')}</nav><div class="sidebar-bottom"><div class="notice">${icon('spark')}<p>Подготовка по шагам.<br>Вечер — с удовольствием.</p></div><div class="profile"><span class="avatar">ДП</span><div class="profile-copy"><strong>Дмитрий</strong><small>${state.demo ? 'Демонстрационный кабинет' : 'Личный кабинет'}</small></div>${iconButton('exit', state.demo ? 'Выйти из примера' : 'Выйти из аккаунта', 'logout')}</div></div></aside><div class="main"><header class="topbar"><span class="breadcrumb">${title}</span><div class="interface-tools" role="group" aria-label="Версия сайта">${button('update-site','Обновить интерфейс','download','secondary interface-update')}${button('clear-cache','Очистить кэш','trash','secondary interface-update')}</div><div class="top-actions"><div id="save-status" role="status" aria-live="polite"></div>${iconButton('sync', 'Обновить данные и календарь', 'refresh')}</div></header><main id="main" class="page">${state.demo ? `<div class="demo-banner"><span>Пример кабинета · мероприятия вымышлены, изменения сохраняются только здесь</span><button data-action="exit">Войти в свой кабинет ${icon('arrow')}</button></div>` : ''}${state.cloudError ? `<div class="notice error-text" role="alert">${esc(state.cloudError)} ${button('sync', 'Повторить', 'refresh', 'ghost')}</div>` : ''}${state.calendarError ? `<div class="notice error-text" role="alert">${esc(state.calendarError)}</div>` : ''}${conflicts().length ? `<div class="notice">Есть разные версии записей на устройствах. ${button('conflicts', 'Выбрать версии', '', 'ghost')}</div>` : ''}<div id="page-content"></div></main></div></div>`;
 }
+
+const eventPaneSelection = new Map();
+const EVENT_PANES = { overview:'Обзор', discussion:'Обсуждение', preparation:'Подготовка', script:'Сценарий' };
+function setEventPane(key, focus=false) {
+  if(!Object.hasOwn(EVENT_PANES,key)) return;
+  eventPaneSelection.set(state.selected,key);
+  document.querySelectorAll('[data-event-pane]').forEach(p=>{p.hidden=p.dataset.eventPane!==key;});
+  document.querySelectorAll('[data-action="event-pane"]').forEach(t=>{
+    const selected=t.dataset.pane===key; t.setAttribute('aria-selected',String(selected)); t.tabIndex=selected?0:-1;
+    if(selected&&focus) t.focus();
+  });
+  scheduleChecklistFit(document.querySelector('[data-event-pane="'+key+'"]')||document);
+}
+function configureWorkspace() {
+  if(state.route==='event') {
+    const layout=document.querySelector('.editor-layout'), panels=[...document.querySelectorAll('.editor-main > section')];
+    if(layout&&panels.length===4) {
+      const keys=Object.keys(EVENT_PANES), tabs=document.createElement('div');
+      tabs.className='event-work-tabs'; tabs.setAttribute('role','tablist'); tabs.setAttribute('aria-label','Раздел мероприятия');
+      tabs.innerHTML=keys.map(key=>'<button type="button" id="event-tab-'+key+'" class="event-work-tab" role="tab" data-action="event-pane" data-pane="'+key+'" aria-controls="event-pane-'+key+'">'+EVENT_PANES[key]+'</button>').join('');
+      layout.before(tabs);
+      panels.forEach((panel,i)=>{panel.dataset.eventPane=keys[i];panel.id='event-pane-'+keys[i];panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby','event-tab-'+keys[i]);});
+      setEventPane(eventPaneSelection.get(state.selected)||'overview');
+    }
+  }
+  if(state.route==='calendar') {
+    const today=localDate(new Date().toISOString());
+    const rows=events().filter(r=>{const s=r.payload.source;return s.status!=='deleted' && !(s.allDay&&s.end ? localDate(s.end)<=today : localDate(s.end||s.start)<today);}), ready=rows.filter(r=>progress(r.payload.body).percent===100).length;
+    const bar=document.createElement('div');bar.className='workspace-statusbar';bar.setAttribute('aria-label','Сводка мероприятий');
+    bar.innerHTML='<span><strong>'+rows.length+'</strong> впереди</span><span><strong>'+rows.filter(r=>r.payload.source.status==='confirmed').length+'</strong> подтверждено</span><span><strong>'+rows.filter(r=>r.payload.source.status==='tentative').length+'</strong> под вопросом</span><span><strong>'+ready+'</strong> подготовлено</span>';
+    document.querySelector('.page-heading')?.after(bar);
+  }
+  if(state.route==='sheet') {
+    const cols=sheetColumns(), table=document.querySelector('.event-sheet');
+    document.querySelectorAll('[data-sheet-col]').forEach(col=>{col.style.width=sheetWidth(col.dataset.sheetCol)+'px';});
+    if(table) table.style.width=cols.reduce((n,key)=>n+sheetWidth(key),0)+'px';
+  }
+}
+document.addEventListener('keydown',e=>{
+  const tab=e.target.closest('[role="tab"][data-pane]');
+  if(!tab||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return;
+  e.preventDefault();const keys=Object.keys(EVENT_PANES),index=keys.indexOf(tab.dataset.pane);
+  const next=e.key==='Home'?0:e.key==='End'?keys.length-1:(index+(e.key==='ArrowRight'?1:-1)+keys.length)%keys.length;
+  setEventPane(keys[next],true);
+});
+
 let renderedEditorKey;
 function render() {
   if (!state.scope) { loginView(); return; }
@@ -211,6 +257,7 @@ function render() {
   else content.innerHTML = calendarView(state.route === 'archive');
   for (const el of document.querySelectorAll('[data-section-key]')) if (sectionStates.has(el.dataset.sectionKey)) el.open = sectionStates.get(el.dataset.sectionKey);
   renderedEditorKey = editorKey;
+  configureWorkspace();
   const preparationToggle = document.querySelector('[data-action="toggle-preparation"]'), preparation = document.querySelector('#preparation-contents');
   if (preparationToggle && preparation) { preparationToggle.setAttribute('aria-expanded', String(preparation.open)); preparationToggle.querySelector('span').textContent = preparation.open ? 'Скрыть задачи' : 'Показать задачи'; }
   const discussionToggle = document.querySelector('[data-action="toggle-discussion"]'), discussion = document.querySelector('#discussion-contents');
@@ -229,10 +276,10 @@ function filteredEvents(archive = false) {
   }).sort((a, b) => a.payload.source.start.localeCompare(b.payload.source.start));
 }
 
-const SHEET_COLUMNS = { title:'Мероприятие', customer:'Заказчик', date:'Дата', time:'Время', venue:'Место', totalCost:'Стоимость, ₽', prepayment:'Предоплата, ₽', team:'Команда', status:'Статус' };
+const SHEET_COLUMNS = { title:'Мероприятие', customer:'Заказчик', date:'Дата', time:'Время', venue:'Место', totalCost:'Стоимость, ₽', prepayment:'Предоплата, ₽', team:'Команда', status:'Статус', readiness:'Подготовка', balance:'Остаток, ₽' };
 function sheetColumns() {
   try { const saved=JSON.parse(localStorage.getItem('zk.sheet-columns:'+state.scope)); if(Array.isArray(saved)&&saved.length&&saved.every(k=>Object.hasOwn(SHEET_COLUMNS,k))) return [...new Set(saved)]; } catch {}
-  return ['title','customer','date','time','venue','totalCost'];
+  return ['title','customer','date','time','venue','totalCost','readiness'];
 }
 function customerLinks(value) {
   return [...new Set(String(value||'').match(/https?:\/\/[^\s<>"']+/g)||[])].map((url,i)=>'<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Ссылка '+(i+1)+'</a>').join(' · ');
@@ -243,6 +290,8 @@ function sheetCell(r,key) {
   if(key==='date') return esc(fmt(s.start,{day:'numeric',month:'short',year:'numeric'}));
   if(key==='time') return s.allDay?'—':esc(fmt(s.start,{hour:'2-digit',minute:'2-digit'})+(s.end?' — '+fmt(s.end,{hour:'2-digit',minute:'2-digit'}):''));
   if(key==='status') return badge(s.status);
+  if(key==='readiness') { const p=progress(b); return '<div class="sheet-readiness"><strong>'+p.percent+'%</strong><progress max="100" value="'+p.percent+'" aria-label="Подготовка '+p.percent+'%"></progress></div>'; }
+  if(key==='balance') return b.totalCost!=='' && b.totalCost!=null && Number.isFinite(Number(b.totalCost)) && Number.isFinite(Number(b.prepayment||0)) ? esc(new Intl.NumberFormat('ru-RU').format(Number(b.totalCost)-Number(b.prepayment||0))) : '—';
   const value=key==='venue'?(b.venue||s.location||''):(b[key]||'');
   const attrs=' data-sheet-field="'+key+'" data-record="'+esc(r.id)+'" aria-label="'+esc(SHEET_COLUMNS[key]+' — '+cleanTitle(s.title))+'"';
   if(['totalCost','prepayment'].includes(key)) return '<input type="number" min="0" inputmode="decimal" value="'+esc(value)+'"'+attrs+'>';
@@ -263,7 +312,7 @@ function sheetRows() {
   });
 }
 function sheetBody(rows,cols) {
-  return rows.map(r=>'<tr>'+cols.map(key=>'<td>'+sheetCell(r,key)+'</td>').join('')+'</tr>').join('') || '<tr><td colspan="'+cols.length+'">Мероприятия не найдены</td></tr>';
+  return rows.map(r=>'<tr>'+cols.map(key=>'<td data-sheet-key="'+key+'">'+sheetCell(r,key)+'</td>').join('')+'</tr>').join('') || '<tr><td colspan="'+cols.length+'">Мероприятия не найдены</td></tr>';
 }
 function updateSheetRows() {
   const rows=sheetRows(), body=document.querySelector('#sheet-body');
@@ -275,7 +324,7 @@ function updateSheetRows() {
 function sheetView() {
   const cols=sheetColumns(), rows=sheetRows();
   const filters='<div class="sheet-filters"><label>Поиск<input type="search" data-sheet-filter="query" value="'+esc(sheetFilters.query)+'" placeholder="Мероприятие, заказчик, место"></label><label>Статус<select data-sheet-filter="status"><option value="">Все</option><option value="confirmed" '+(sheetFilters.status==='confirmed'?'selected':'')+'>Подтверждено</option><option value="tentative" '+(sheetFilters.status==='tentative'?'selected':'')+'>Не подтверждено</option></select></label><label>С даты<input type="date" data-sheet-filter="from" value="'+esc(sheetFilters.from)+'"></label><label>По дату<input type="date" data-sheet-filter="to" value="'+esc(sheetFilters.to)+'"></label>'+button('sheet-reset-filters','Сбросить','','ghost')+'</div>';
-  return '<div class="page-heading"><h1>Динамичный лист</h1><span id="sheet-count">'+rows.length+' мероприятий</span></div>'+filters+'<details class="sheet-settings"><summary>Столбцы</summary><div class="sheet-column-options">'+Object.entries(SHEET_COLUMNS).map(([key,label])=>'<label><input type="checkbox" data-sheet-column="'+key+'" '+(cols.includes(key)?'checked':'')+'> '+label+'</label>').join('')+'</div></details><div class="sheet-scroll" tabindex="0" role="region" aria-label="Таблица будущих мероприятий"><table class="event-sheet" style="width:'+cols.reduce((n,k)=>n+sheetWidth(k),0)+'px"><colgroup>'+cols.map(k=>'<col data-sheet-col="'+k+'" style="width:'+sheetWidth(k)+'px">').join('')+'</colgroup><thead><tr>'+cols.map(key=>'<th scope="col" data-sheet-header="'+key+'"><button type="button" class="sheet-drag" data-sheet-drag="'+key+'" title="Перетащить; Alt + стрелки — порядок" aria-label="Переместить столбец '+SHEET_COLUMNS[key]+'"><span aria-hidden="true">⠿</span> '+SHEET_COLUMNS[key]+'</button><span class="sheet-resize" data-sheet-resize="'+key+'" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Ширина: '+SHEET_COLUMNS[key]+'" aria-valuemin="120" aria-valuemax="900" aria-valuenow="'+sheetWidth(key)+'"></span></th>').join('')+'</tr></thead><tbody id="sheet-body">'+sheetBody(rows,cols)+'</tbody></table></div>';
+  return '<div class="page-heading"><h1>Динамичный лист</h1><span id="sheet-count">'+rows.length+' мероприятий</span></div>'+filters+'<details class="sheet-settings"><summary>Столбцы</summary><div class="sheet-column-options">'+Object.entries(SHEET_COLUMNS).map(([key,label])=>'<label><input type="checkbox" data-sheet-column="'+key+'" '+(cols.includes(key)?'checked':'')+'> '+label+'</label>').join('')+'</div></details><div class="sheet-scroll" tabindex="0" role="region" aria-label="Таблица будущих мероприятий"><table class="event-sheet"><colgroup>'+cols.map(k=>'<col data-sheet-col="'+k+'">').join('')+'</colgroup><thead><tr>'+cols.map(key=>'<th scope="col" data-sheet-header="'+key+'"><button type="button" class="sheet-drag" data-sheet-drag="'+key+'" title="Перетащить; Alt + стрелки — порядок" aria-label="Переместить столбец '+SHEET_COLUMNS[key]+'"><span aria-hidden="true">⠿</span> '+SHEET_COLUMNS[key]+'</button><span class="sheet-resize" data-sheet-resize="'+key+'" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Ширина: '+SHEET_COLUMNS[key]+'" aria-valuemin="120" aria-valuemax="900" aria-valuenow="'+sheetWidth(key)+'"></span></th>').join('')+'</tr></thead><tbody id="sheet-body">'+sheetBody(rows,cols)+'</tbody></table></div>';
 }
 function reorderSheetColumn(key,target,after=false) {
   const cols=sheetColumns(); if(key===target||!cols.includes(key)||!cols.includes(target)) return;
@@ -373,7 +422,7 @@ function eventView() {
   const r = current(); if (!r) return emptyState('Карточка не найдена', 'Вернись к списку мероприятий.');
   const { source: s, body: b } = r.payload, p = progress(b);
   const eventTime = s.allDay ? 'Время не указано' : fmt(s.start, { hour: '2-digit', minute: '2-digit' }) + (s.end ? ' — ' + fmt(s.end, { hour: '2-digit', minute: '2-digit' }) : '');
-  return `<div class="page-heading event-heading"><div>${button('back-calendar', 'Все мероприятия', 'back', 'ghost')}<h1>${esc(cleanTitle(s.title))}</h1></div>${badge(s.status)}</div>${s.status === 'deleted' ? '<p class="notice">Событие удалено из Google Календаря. Все материалы подготовки сохранены.</p>' : ''}<section class="panel event-quick-info"><h2>Краткая информация</h2><div class="event-quick-layout"><div class="event-quick-fields"><dl class="event-info-grid"><div><dt>Дата</dt><dd>${esc(fmt(s.start, { day: 'numeric', month: 'long', year: 'numeric' }))}</dd></div><div><dt><label for="f-venue">Место</label></dt><dd><textarea id="f-venue" data-field="venue" data-auto-grow rows="1" placeholder="Место / площадка">${esc(b.venue || s.location || '')}</textarea></dd></div><div><dt>Время</dt><dd>${esc(eventTime)}</dd></div></dl><div class="event-cost-team">${field('Общая стоимость, ₽', b.totalCost || '', 'totalCost', {input:'number',attrs:'min="0" step="100" inputmode="decimal"'})}${field('Предоплата, ₽', b.prepayment || '', 'prepayment', {input:'number',attrs:'min="0" step="100" inputmode="decimal"'})}${field('Состав команды', b.team || '', 'team', {placeholder:'Например: ведущий, DJ, координатор',rows:1,attrs:'data-auto-grow'})}${field('Заказчик', b.customer || '', 'customer', {placeholder:'Контакт, описание и ссылки',rows:1,attrs:'data-auto-grow'})}</div></div><section class="calendar-summary" aria-label="Описание из Google Календаря"><h3>Описание из Google Календаря</h3><p class="plain-text">${s.calendarDescription ? esc(s.calendarDescription) : 'Записи нет в Google Календаре'}</p></section></div></section><div class="editor-layout"><div class="editor-main"><section class="panel">${editorHeading('01', 'О мероприятии', 'Контекст, пожелания и важные детали')}${renderRichEditor('description', 'Описание', b.description, b.descriptionHtml, {className:'compact-event-description'})}${b.category === 'wedding' ? field('Анкеты', b.questionnaires || '', 'questionnaires', {placeholder:'Вставь сюда текст анкет молодожёнов…',rows:1,class:'questionnaires-field',attrs:'data-auto-grow'}) : ''}</section><section class="panel list-panel">${discussionHeading(b)}${eventQuestions(b)}${questionActions(b)}</section><section class="panel list-panel">${editorHeading('03', 'Подготовка', '', `<span class="section-progress">${b.tasks.filter(x => x.done).length}/${b.tasks.length}</span>${button('toggle-preparation','Скрыть задачи','','ghost','aria-controls="preparation-contents" aria-expanded="true"')}`)}<details id="preparation-contents" data-section-key="preparation-block" open><summary hidden>Задачи подготовки</summary>${checklistTools('tasks')}<div class="checklist">${b.tasks.length ? renderChecklist(b.tasks, 'tasks') : ''}</div></details>${taskActions(b)}</section><section class="panel">${editorHeading('04', 'Конечный сценарий', 'Основная версия — в Google Документах')}${field('Ссылка на Google Документ', b.scriptUrl, 'scriptUrl', { input: 'url', placeholder: 'https://docs.google.com/document/d/…', attrs: 'aria-describedby="script-help"' })}<p id="script-help" class="form-help">Чтобы открыть сценарий без интернета, заранее настрой офлайн-доступ в Google Документах.</p><div id="script-open">${scriptAction(b.scriptUrl)}</div></section></div><aside class="editor-aside"><section class="panel"><div class="summary-progress"><strong id="progress-percent">${p.percent}%</strong><span>шаг за шагом</span></div><progress id="event-progress" value="${p.percent}" max="100" aria-label="Готовность мероприятия"></progress></section><section class="panel template-picker">${eventCategory(b.category)}${button('choose-template', b.templateId ? 'Добавить из шаблона' : 'Выбрать шаблон', 'templates', 'secondary')}</section><section class="notice">${icon('check')}<p id="offline-ready">Сохранено для работы на этом устройстве. Для первого открытия на другом устройстве нужен интернет.</p></section></aside></div>`;
+  return `<div class="page-heading event-heading"><div>${button('back-calendar', 'Все мероприятия', 'back', 'ghost')}<h1>${esc(cleanTitle(s.title))}</h1></div>${badge(s.status)}</div>${s.status === 'deleted' ? '<p class="notice">Событие удалено из Google Календаря. Все материалы подготовки сохранены.</p>' : ''}<section class="panel event-quick-info"><h2>Краткая информация</h2><div class="event-quick-layout"><div class="event-quick-fields"><dl class="event-info-grid"><div><dt>Дата</dt><dd>${esc(fmt(s.start, { day: 'numeric', month: 'long', year: 'numeric' }))}</dd></div><div><dt><label for="f-venue">Место</label></dt><dd><textarea id="f-venue" data-field="venue" data-auto-grow rows="1" placeholder="Место / площадка">${esc(b.venue || s.location || '')}</textarea></dd></div><div><dt>Время</dt><dd>${esc(eventTime)}</dd></div></dl><div class="event-cost-team">${field('Общая стоимость, ₽', b.totalCost || '', 'totalCost', {input:'number',attrs:'min="0" step="100" inputmode="decimal"'})}${field('Предоплата, ₽', b.prepayment || '', 'prepayment', {input:'number',attrs:'min="0" step="100" inputmode="decimal"'})}${field('Состав команды', b.team || '', 'team', {placeholder:'Например: ведущий, DJ, координатор',rows:1,attrs:'data-auto-grow'})}${field('Заказчик', b.customer || '', 'customer', {placeholder:'Контакт, описание и ссылки',rows:1,attrs:'data-auto-grow'})}</div></div><section class="calendar-summary" aria-label="Описание из Google Календаря"><h3>Описание из Google Календаря</h3><p class="plain-text">${s.calendarDescription ? esc(s.calendarDescription) : 'Записи нет в Google Календаре'}</p></section></div></section><div class="editor-layout"><div class="editor-main"><section class="panel">${editorHeading('01', 'О мероприятии', 'Контекст, пожелания и важные детали')}${renderRichEditor('description', 'Описание', b.description, b.descriptionHtml, {className:'compact-event-description'})}${b.category === 'wedding' ? field('Анкеты', b.questionnaires || '', 'questionnaires', {placeholder:'Вставь сюда текст анкет молодожёнов…',rows:1,class:'questionnaires-field',attrs:'data-auto-grow'}) : ''}</section><section class="panel list-panel">${discussionHeading(b)}${eventQuestions(b)}${questionActions(b)}</section><section class="panel list-panel">${editorHeading('03', 'Подготовка', '', `<span class="section-progress">${b.tasks.filter(x => x.done).length}/${b.tasks.length}</span>${button('toggle-preparation','Скрыть задачи','','ghost','aria-controls="preparation-contents" aria-expanded="true"')}`)}<details id="preparation-contents" data-section-key="preparation-block" open><summary hidden>Задачи подготовки</summary>${checklistTools('tasks')}<div class="checklist">${b.tasks.length ? renderChecklist(b.tasks, 'tasks') : ''}</div></details>${taskActions(b)}</section><section class="panel">${editorHeading('04', 'Конечный сценарий', 'Основная версия — в Google Документах')}${field('Ссылка на Google Документ', b.scriptUrl, 'scriptUrl', { input: 'url', placeholder: 'https://docs.google.com/document/d/…', attrs: 'aria-describedby="script-help"' })}<p id="script-help" class="form-help">Чтобы открыть сценарий без интернета, заранее настрой офлайн-доступ в Google Документах.</p><div id="script-open">${scriptAction(b.scriptUrl)}</div></section></div><aside class="editor-aside"><section class="panel"><div class="summary-progress"><strong id="progress-percent">${p.percent}%</strong><span id="progress-count">${p.done} из ${p.total}</span></div><progress id="event-progress" value="${p.percent}" max="100" aria-label="Готовность мероприятия"></progress></section><section class="panel template-picker">${eventCategory(b.category)}${button('choose-template', b.templateId ? 'Добавить из шаблона' : 'Выбрать шаблон', 'templates', 'secondary')}</section><section class="notice">${icon('check')}<p id="offline-ready">Сохранено для работы на этом устройстве. Для первого открытия на другом устройстве нужен интернет.</p></section></aside></div>`;
 }
 function scriptAction(value) {
   const url = scriptLink(value);
@@ -389,6 +438,7 @@ let checklistFitFrame, checklistFitTarget;
 function fitChecklistFields(root = document) {
   const fields = root.matches?.('textarea') ? [root] : root.querySelectorAll('.check-fields textarea, textarea[data-auto-grow]');
   for (const el of fields) {
+    if(el.closest('[hidden]')) continue;
     let parent = el.closest('details'), visible = true;
     while(parent) { if (!parent.open) { visible = false; break; } parent = parent.parentElement?.closest('details'); }
     if (!visible) continue;
@@ -685,6 +735,7 @@ document.addEventListener('click', safeAction(async e => {
     el.setAttribute('aria-expanded',String(block.open)); el.querySelector('span').textContent = block.open ? (preparation ? 'Скрыть задачи' : 'Скрыть вопросы') : (preparation ? 'Показать задачи' : 'Показать вопросы'); return;
   }
   if (action === 'sheet-reset-filters') { sheetFilters={query:'',status:'',from:'',to:''}; render(); return; }
+  if (action === 'event-pane') { setEventPane(el.dataset.pane); return; }
   if (action === 'navigate') return navigate(el.dataset.route);
   if (action === 'close-modal') return closeModal();
   if (action === 'exit') return leave();
@@ -758,6 +809,8 @@ document.addEventListener('input', safeAction(async e => {
     const r=record(el.dataset.record), key=el.dataset.sheetField;
     if(r?.kind!=='event'||!['customer','venue','totalCost','prepayment','team'].includes(key)) return;
     r.payload.body[key]=el.value; changed(r);
+    const tableRow=el.closest('tr');
+    for(const derived of ['balance','readiness']) { const cell=tableRow?.querySelector('[data-sheet-key="'+derived+'"]'); if(cell) cell.innerHTML=sheetCell(r,derived); }
     if(el.matches('textarea[data-auto-grow]')) scheduleChecklistFit(el);
     if(key==='customer') el.closest('td').querySelector('.sheet-links').innerHTML=customerLinks(el.value);
     return;
@@ -818,7 +871,7 @@ document.addEventListener('change', safeAction(async e => {
   if (el.dataset.check) {
     const r = current(), body = r?.payload.body, x = body?.[el.dataset.check]?.find(x => x.id === el.dataset.id); if (!x) return;
     x.done = el.checked; changed(r);
-    const p = progress(body); $('#progress-percent').textContent = `${p.percent}%`; $('#event-progress').value = p.percent; $('#progress-count').textContent = `${p.done} из ${p.total} пунктов выполнено`;
+    const p = progress(body); $('#progress-percent').textContent = `${p.percent}%`; $('#event-progress').value = p.percent; if($('#progress-count')) $('#progress-count').textContent = `${p.done} из ${p.total}`;
     const container = el.closest('.check-item'); container.classList.toggle('completed', x.done);
     const panel = el.closest('.panel'), group = body[el.dataset.check]; panel.querySelector('.section-progress').textContent = `${group.filter(x => x.done).length}/${group.length}`;
     const section = el.closest('.checklist-section');
