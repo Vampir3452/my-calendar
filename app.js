@@ -6,7 +6,7 @@ import { renderRichEditor, wireRichEditors } from './lib/rich-text.js';
 import { recordChanges, describeDevice } from './lib/change-history.js';
 import { CATEGORIES, SCHEMA_VERSION, clone, sameContent, uid, item, createTemplate, clearTaskList, restoreTaskList, clearQuestionList, restoreQuestionList, discardRecoveredItems, replaceTemplateTasks, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
 
-const APP_VERSION = '0.4.15';
+const APP_VERSION = '0.4.16';
 const historyBaseline = new Map();
 const device = (() => {
   try {
@@ -652,7 +652,7 @@ document.addEventListener('input', safeAction(async e => {
     const key = el.dataset.field;
     if (r.kind === 'template' && key === 'template-name') r.payload.name = el.value;
     else if (r.kind === 'template' && key === 'template-category' && Object.hasOwn(CATEGORIES, el.value)) r.payload.category = el.value;
-    else if (r.kind === 'event' && ['description', 'notes', 'category', 'scriptUrl', 'questionnaires', 'totalCost', 'team', 'venue', 'prepayment'].includes(key)) {
+    else if (r.kind === 'event' && ['description', 'notes', 'category', 'scriptUrl', 'questionnaires', 'totalCost', 'team', 'venue', 'prepayment', 'customer'].includes(key)) {
       if (key === 'scriptUrl') {
         const checked = scriptLink(el.value);
         $('#script-open').innerHTML = scriptAction(el.value);
