@@ -4,9 +4,9 @@ import * as api from './lib/api.js';
 import { parseTaskFile, downloadTaskWorkbook } from './lib/task-import.js';
 import { renderRichEditor, wireRichEditors } from './lib/rich-text.js';
 import { recordChanges, describeDevice } from './lib/change-history.js';
-import { CATEGORIES, SCHEMA_VERSION, clone, sameContent, uid, item, createTemplate, clearTaskList, restoreTaskList, clearQuestionList, restoreQuestionList, discardRecoveredItems, replaceTemplateTasks, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, seedCorporateTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
+import { CATEGORIES, SCHEMA_VERSION, clone, sameContent, uid, item, createTemplate, clearTaskList, restoreTaskList, clearQuestionList, restoreQuestionList, discardRecoveredItems, replaceTemplateTasks, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, seedCorporateTemplate, seedBirthdayTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
 
-const APP_VERSION = '0.4.17';
+const APP_VERSION = '0.4.18';
 const historyBaseline = new Map();
 const device = (() => {
   try {
@@ -147,7 +147,7 @@ async function performSync(includeCalendar) {
     // cannot silently replace templates prepared elsewhere.
     for (const t of defaultTemplates()) if (!record(t.id)) { state.records.push(t); persist(t, false); }
     for (const local of templates()) {
-      const seeded = seedWeddingTemplate(local) || seedCorporateTemplate(local);
+      const seeded = seedWeddingTemplate(local) || seedCorporateTemplate(local) || seedBirthdayTemplate(local);
       if (seeded) { Object.assign(local, seeded); persist(local, false); }
     }
     for (const local of state.records.filter(r => r.dirty && !r.conflict)) {
@@ -413,7 +413,7 @@ async function enterDemo() {
   if (!state.records.length) { state.records = demoRecords(); await db.writeMany('demo', state.records); }
   rememberHistory(state.records);
   for (const local of templates()) {
-    const seeded = seedWeddingTemplate(local) || seedCorporateTemplate(local);
+    const seeded = seedWeddingTemplate(local) || seedCorporateTemplate(local) || seedBirthdayTemplate(local);
     if (seeded) { Object.assign(local, seeded); persist(local, false); }
   }
   state.lastCalendar = null; state.cloudError = ''; state.calendarError = '';
