@@ -695,3 +695,5 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 @media (max-width: 600px) { .event-quick-info { padding: 16px; } .event-quick-layout { grid-template-columns: 1fr; gap: 12px; } .event-quick-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; } .calendar-summary { min-height: 0; } .event-cost-team .field:last-child { grid-column: 1 / -1; } }
 
 .conflict-summary { margin: 10px 0 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft, #f8f8f4); font-size: 14px; line-height: 1.45; }
+
+.event-quick-fields .event-cost-team .field:last-child { grid-column: 1 / -1; }
