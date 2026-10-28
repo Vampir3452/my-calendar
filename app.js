@@ -6,7 +6,7 @@ import { renderRichEditor, wireRichEditors } from './lib/rich-text.js';
 import { recordChanges, describeDevice } from './lib/change-history.js';
 import { CATEGORIES, SCHEMA_VERSION, clone, sameContent, uid, item, createTemplate, clearTaskList, restoreTaskList, clearQuestionList, restoreQuestionList, discardRecoveredItems, replaceTemplateTasks, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, seedCorporateTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
 
-const APP_VERSION = '0.4.16';
+const APP_VERSION = '0.4.17';
 const historyBaseline = new Map();
 const device = (() => {
   try {
@@ -193,8 +193,8 @@ function loginView(message = '') {
 }
 function navigation(route, label, glyph) { return `<button class="nav-item ${state.route === route ? 'active' : ''}" data-action="navigate" data-route="${route}" ${state.route === route ? 'aria-current="page"' : ''}>${icon(glyph)}<span>${label}</span>${route === 'settings' ? '<span id="conflict-count"></span>' : ''}</button>`; }
 function shell() {
-  const title = state.route === 'changes' ? 'История изменений' : state.route === 'templates' ? 'Шаблоны' : state.route === 'settings' ? 'Настройки' : state.route === 'event' ? 'Мероприятия / Подготовка' : state.route === 'archive' ? 'История мероприятий' : 'Мероприятия';
-  return `<div class="shell"><aside class="sidebar"><a class="brand" href="#calendar" data-action="navigate" data-route="calendar"><span class="brand-mark">LG</span><span class="brand-copy">Let’s Go!<small>Кабинет ведущего</small></span></a><nav class="nav" aria-label="Основная навигация">${navigation('calendar', 'Мероприятия', 'calendar')}${navigation('templates', 'Шаблоны', 'templates')}${navigation('archive', 'Архив', 'clock')}${navigation('changes', 'Изменения', 'note')}${navigation('settings', 'Настройки', 'settings')}</nav><div class="sidebar-bottom"><div class="notice">${icon('spark')}<p>Подготовка по шагам.<br>Вечер — с удовольствием.</p></div><div class="profile"><span class="avatar">ДП</span><div class="profile-copy"><strong>Дмитрий</strong><small>${state.demo ? 'Демонстрационный кабинет' : 'Личный кабинет'}</small></div>${iconButton('exit', state.demo ? 'Выйти из примера' : 'Выйти из аккаунта', 'logout')}</div></div></aside><div class="main"><header class="topbar"><span class="breadcrumb">${title}</span><div class="interface-tools" role="group" aria-label="Версия сайта">${button('update-site','Обновить интерфейс','download','secondary interface-update')}${button('clear-cache','Очистить кэш','trash','secondary interface-update')}</div><div class="top-actions"><div id="save-status" role="status" aria-live="polite"></div>${iconButton('sync', 'Обновить данные и календарь', 'refresh')}</div></header><main id="main" class="page">${state.demo ? `<div class="demo-banner"><span>Пример кабинета · мероприятия вымышлены, изменения сохраняются только здесь</span><button data-action="exit">Войти в свой кабинет ${icon('arrow')}</button></div>` : ''}${state.cloudError ? `<div class="notice error-text" role="alert">${esc(state.cloudError)} ${button('sync', 'Повторить', 'refresh', 'ghost')}</div>` : ''}${state.calendarError ? `<div class="notice error-text" role="alert">${esc(state.calendarError)}</div>` : ''}${conflicts().length ? `<div class="notice">Есть разные версии записей на устройствах. ${button('conflicts', 'Выбрать версии', '', 'ghost')}</div>` : ''}<div id="page-content"></div></main></div></div>`;
+  const title = state.route === 'sheet' ? 'Динамичный лист' : state.route === 'changes' ? 'История изменений' : state.route === 'templates' ? 'Шаблоны' : state.route === 'settings' ? 'Настройки' : state.route === 'event' ? 'Мероприятия / Подготовка' : state.route === 'archive' ? 'История мероприятий' : 'Мероприятия';
+  return `<div class="shell"><aside class="sidebar"><a class="brand" href="#calendar" data-action="navigate" data-route="calendar"><span class="brand-mark">LG</span><span class="brand-copy">Let’s Go!<small>Кабинет ведущего</small></span></a><nav class="nav" aria-label="Основная навигация">${navigation('calendar', 'Мероприятия', 'calendar')}${navigation('sheet', 'Динамичный лист', 'note')}${navigation('templates', 'Шаблоны', 'templates')}${navigation('archive', 'Архив', 'clock')}${navigation('changes', 'Изменения', 'note')}${navigation('settings', 'Настройки', 'settings')}</nav><div class="sidebar-bottom"><div class="notice">${icon('spark')}<p>Подготовка по шагам.<br>Вечер — с удовольствием.</p></div><div class="profile"><span class="avatar">ДП</span><div class="profile-copy"><strong>Дмитрий</strong><small>${state.demo ? 'Демонстрационный кабинет' : 'Личный кабинет'}</small></div>${iconButton('exit', state.demo ? 'Выйти из примера' : 'Выйти из аккаунта', 'logout')}</div></div></aside><div class="main"><header class="topbar"><span class="breadcrumb">${title}</span><div class="interface-tools" role="group" aria-label="Версия сайта">${button('update-site','Обновить интерфейс','download','secondary interface-update')}${button('clear-cache','Очистить кэш','trash','secondary interface-update')}</div><div class="top-actions"><div id="save-status" role="status" aria-live="polite"></div>${iconButton('sync', 'Обновить данные и календарь', 'refresh')}</div></header><main id="main" class="page">${state.demo ? `<div class="demo-banner"><span>Пример кабинета · мероприятия вымышлены, изменения сохраняются только здесь</span><button data-action="exit">Войти в свой кабинет ${icon('arrow')}</button></div>` : ''}${state.cloudError ? `<div class="notice error-text" role="alert">${esc(state.cloudError)} ${button('sync', 'Повторить', 'refresh', 'ghost')}</div>` : ''}${state.calendarError ? `<div class="notice error-text" role="alert">${esc(state.calendarError)}</div>` : ''}${conflicts().length ? `<div class="notice">Есть разные версии записей на устройствах. ${button('conflicts', 'Выбрать версии', '', 'ghost')}</div>` : ''}<div id="page-content"></div></main></div></div>`;
 }
 let renderedEditorKey;
 function render() {
@@ -204,6 +204,7 @@ function render() {
   $('#app').innerHTML = shell();
   const content = $('#page-content');
   if (state.route === 'event') content.innerHTML = eventView();
+  else if (state.route === 'sheet') content.innerHTML = sheetView();
   else if (state.route === 'changes') content.innerHTML = changesView();
   else if (state.route === 'templates') content.innerHTML = templatesView();
   else if (state.route === 'settings') content.innerHTML = settingsView();
@@ -227,6 +228,31 @@ function filteredEvents(archive = false) {
       && `${s.title} ${b.venue || s.location || ''} ${b.description} ${b.notes}`.toLowerCase().includes(state.query.toLowerCase());
   }).sort((a, b) => a.payload.source.start.localeCompare(b.payload.source.start));
 }
+
+const SHEET_COLUMNS = { title:'Мероприятие', customer:'Заказчик', date:'Дата', time:'Время', venue:'Место', totalCost:'Стоимость, ₽', prepayment:'Предоплата, ₽', team:'Команда', status:'Статус' };
+function sheetColumns() {
+  try { const saved=JSON.parse(localStorage.getItem('zk.sheet-columns:'+state.scope)); if(Array.isArray(saved)&&saved.length&&saved.every(k=>Object.hasOwn(SHEET_COLUMNS,k))) return [...new Set(saved)]; } catch {}
+  return ['title','customer','date','time','venue','totalCost'];
+}
+function customerLinks(value) {
+  return [...new Set(String(value||'').match(/https?:\/\/[^\s<>"']+/g)||[])].map((url,i)=>'<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Ссылка '+(i+1)+'</a>').join(' · ');
+}
+function sheetCell(r,key) {
+  const {source:s,body:b}=r.payload;
+  if(key==='title') return button('open-event',cleanTitle(s.title),'','ghost','data-id="'+esc(r.id)+'"');
+  if(key==='date') return esc(fmt(s.start,{day:'numeric',month:'short',year:'numeric'}));
+  if(key==='time') return s.allDay?'—':esc(fmt(s.start,{hour:'2-digit',minute:'2-digit'})+(s.end?' — '+fmt(s.end,{hour:'2-digit',minute:'2-digit'}):''));
+  if(key==='status') return badge(s.status);
+  const value=key==='venue'?(b.venue||s.location||''):(b[key]||'');
+  const attrs=' data-sheet-field="'+key+'" data-record="'+esc(r.id)+'" aria-label="'+esc(SHEET_COLUMNS[key]+' — '+cleanTitle(s.title))+'"';
+  if(['totalCost','prepayment'].includes(key)) return '<input type="number" min="0" inputmode="decimal" value="'+esc(value)+'"'+attrs+'>';
+  return '<textarea rows="1" data-auto-grow'+attrs+'>'+esc(value)+'</textarea>'+(key==='customer'?'<div class="sheet-links">'+customerLinks(value)+'</div>':'');
+}
+function sheetView() {
+  const cols=sheetColumns(), rows=filteredEvents(false);
+  return '<div class="page-heading"><h1>Динамичный лист</h1><span>'+rows.length+' мероприятий</span></div><details class="sheet-settings"><summary>Столбцы</summary><div class="sheet-column-options">'+Object.entries(SHEET_COLUMNS).map(([key,label])=>'<label><input type="checkbox" data-sheet-column="'+key+'" '+(cols.includes(key)?'checked':'')+'> '+label+'</label>').join('')+'</div></details><div class="sheet-scroll" tabindex="0" role="region" aria-label="Таблица будущих мероприятий"><table class="event-sheet"><thead><tr>'+cols.map(key=>'<th scope="col">'+SHEET_COLUMNS[key]+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(key=>'<td>'+sheetCell(r,key)+'</td>').join('')+'</tr>').join('')+(rows.length?'':'<tr><td colspan="'+cols.length+'">Предстоящих мероприятий нет</td></tr>')+'</tbody></table></div>';
+}
+
 function eventRow(r) {
   const { source: s, body: b } = r.payload, p = progress(b);
   return `<button class="list-row" data-action="open-event" data-id="${esc(r.id)}"><span class="list-date"><strong>${fmt(s.start, { day: '2-digit' })}</strong><small>${fmt(s.start, { month: 'short' })}</small></span><span class="list-title"><strong>${esc(cleanTitle(s.title))}</strong><small>${esc(CATEGORIES[b.category])} · ${s.allDay ? 'Время не указано' : fmt(s.start, { hour: '2-digit', minute: '2-digit' })}</small></span>${badge(s.status)}<span class="list-progress"><progress max="100" value="${p.percent}" aria-label="Готовность ${p.percent}%"></progress><small>${p.done} из ${p.total}</small></span>${icon('right')}</button>`;
@@ -642,6 +668,15 @@ document.addEventListener('click', safeAction(async e => {
 }));
 document.addEventListener('input', safeAction(async e => {
   const el = e.target;
+  if (el.dataset.sheetField) {
+    const r=record(el.dataset.record), key=el.dataset.sheetField;
+    if(r?.kind!=='event'||!['customer','venue','totalCost','prepayment','team'].includes(key)) return;
+    r.payload.body[key]=el.value; changed(r);
+    if(el.matches('textarea[data-auto-grow]')) scheduleChecklistFit(el);
+    if(key==='customer') el.closest('td').querySelector('.sheet-links').innerHTML=customerLinks(el.value);
+    return;
+  }
+
   if (el.id === 'event-search') {
     state.query = el.value; const focusStart = el.selectionStart; const content = calendarView(state.route === 'archive');
     const parser = new DOMParser().parseFromString(content, 'text/html'); $('#event-results').innerHTML = parser.querySelector('#event-results').innerHTML;
@@ -684,6 +719,14 @@ document.addEventListener('input', safeAction(async e => {
 }));
 document.addEventListener('change', safeAction(async e => {
   const el = e.target;
+  if(el.dataset.sheetColumn) {
+    const key=el.dataset.sheetColumn, cols=sheetColumns();
+    const next=el.checked?[...cols,key]:cols.filter(k=>k!==key);
+    if(!next.length){el.checked=true;return;}
+    localStorage.setItem('zk.sheet-columns:'+state.scope,JSON.stringify(next));
+    render(); return;
+  }
+
   if (el.id === 'restore-file') return previewRestore(el.files[0]);
   if (el.id === 'task-import-file') return previewTaskImport(el.files[0]);
   if (el.dataset.check) {

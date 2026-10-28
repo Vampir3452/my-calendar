@@ -697,3 +697,19 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 .conflict-summary { margin: 10px 0 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft, #f8f8f4); font-size: 14px; line-height: 1.45; }
 
 .event-quick-fields .event-cost-team .field:last-child { grid-column: 1 / -1; }
+
+.sheet-settings { margin-bottom: 12px; }
+.sheet-settings summary { cursor: pointer; width: fit-content; padding: 8px 0; }
+.sheet-column-options { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 8px 0; }
+.sheet-column-options label { display: flex; align-items: center; gap: 6px; min-height: 36px; }
+.sheet-scroll { overflow: auto; max-height: 75vh; border: 1px solid var(--line); border-radius: 10px; background: white; }
+.event-sheet { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 14px; }
+.event-sheet th { position: sticky; top: 0; background: #eef1e8; z-index: 1; font-weight: 600; white-space: nowrap; }
+.event-sheet th, .event-sheet td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); min-width: 135px; }
+.event-sheet tbody tr:last-child td { border-bottom: 0; }
+.event-sheet tbody tr:hover { background: #f8f9f5; }
+.event-sheet td .button { text-align: left; white-space: normal; padding: 5px 0; }
+.event-sheet input, .event-sheet textarea { min-width: 140px; min-height: 40px; padding: 7px 8px; width: 100%; }
+.event-sheet textarea { resize: none; overflow-y: hidden; }
+.sheet-links { font-size: 13px; overflow-wrap: anywhere; margin-top: 4px; }
+@media (pointer: coarse) { .sheet-column-options label { min-height: 44px; } .event-sheet input, .event-sheet textarea { min-height: 44px; } }
