@@ -248,10 +248,94 @@ function sheetCell(r,key) {
   if(['totalCost','prepayment'].includes(key)) return '<input type="number" min="0" inputmode="decimal" value="'+esc(value)+'"'+attrs+'>';
   return '<textarea rows="1" data-auto-grow'+attrs+'>'+esc(value)+'</textarea>'+(key==='customer'?'<div class="sheet-links">'+customerLinks(value)+'</div>':'');
 }
-function sheetView() {
-  const cols=sheetColumns(), rows=filteredEvents(false);
-  return '<div class="page-heading"><h1>Динамичный лист</h1><span>'+rows.length+' мероприятий</span></div><details class="sheet-settings"><summary>Столбцы</summary><div class="sheet-column-options">'+Object.entries(SHEET_COLUMNS).map(([key,label])=>'<label><input type="checkbox" data-sheet-column="'+key+'" '+(cols.includes(key)?'checked':'')+'> '+label+'</label>').join('')+'</div></details><div class="sheet-scroll" tabindex="0" role="region" aria-label="Таблица будущих мероприятий"><table class="event-sheet"><thead><tr>'+cols.map(key=>'<th scope="col">'+SHEET_COLUMNS[key]+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(key=>'<td>'+sheetCell(r,key)+'</td>').join('')+'</tr>').join('')+(rows.length?'':'<tr><td colspan="'+cols.length+'">Предстоящих мероприятий нет</td></tr>')+'</tbody></table></div>';
+
+let sheetFilters = { query:'', status:'', from:'', to:'' };
+function sheetWidths() {
+  try { const value=JSON.parse(localStorage.getItem('zk.sheet-widths:'+state.scope)); if(value && typeof value==='object' && !Array.isArray(value)) return Object.fromEntries(Object.entries(value).filter(([k,v])=>Object.hasOwn(SHEET_COLUMNS,k)&&Number.isFinite(v)&&v>=120&&v<=900)); } catch {}
+  return {};
 }
+function sheetWidth(key) { return sheetWidths()[key] || (['title','customer','team'].includes(key)?240:160); }
+function sheetRows() {
+  return filteredEvents(false).filter(r=>{
+    const {source:s,body:b}=r.payload, date=localDate(s.start);
+    const text=[s.title,b.customer,b.venue||s.location,b.team,b.totalCost,b.prepayment].join(' ').toLocaleLowerCase('ru');
+    return (!sheetFilters.query||text.includes(sheetFilters.query.toLocaleLowerCase('ru'))) && (!sheetFilters.status||s.status===sheetFilters.status) && (!sheetFilters.from||date>=sheetFilters.from) && (!sheetFilters.to||date<=sheetFilters.to);
+  });
+}
+function sheetBody(rows,cols) {
+  return rows.map(r=>'<tr>'+cols.map(key=>'<td>'+sheetCell(r,key)+'</td>').join('')+'</tr>').join('') || '<tr><td colspan="'+cols.length+'">Мероприятия не найдены</td></tr>';
+}
+function updateSheetRows() {
+  const rows=sheetRows(), body=document.querySelector('#sheet-body');
+  if(!body) return;
+  body.innerHTML=sheetBody(rows,sheetColumns());
+  document.querySelector('#sheet-count').textContent=rows.length+' мероприятий';
+  scheduleChecklistFit(body);
+}
+function sheetView() {
+  const cols=sheetColumns(), rows=sheetRows();
+  const filters='<div class="sheet-filters"><label>Поиск<input type="search" data-sheet-filter="query" value="'+esc(sheetFilters.query)+'" placeholder="Мероприятие, заказчик, место"></label><label>Статус<select data-sheet-filter="status"><option value="">Все</option><option value="confirmed" '+(sheetFilters.status==='confirmed'?'selected':'')+'>Подтверждено</option><option value="tentative" '+(sheetFilters.status==='tentative'?'selected':'')+'>Не подтверждено</option></select></label><label>С даты<input type="date" data-sheet-filter="from" value="'+esc(sheetFilters.from)+'"></label><label>По дату<input type="date" data-sheet-filter="to" value="'+esc(sheetFilters.to)+'"></label>'+button('sheet-reset-filters','Сбросить','','ghost')+'</div>';
+  return '<div class="page-heading"><h1>Динамичный лист</h1><span id="sheet-count">'+rows.length+' мероприятий</span></div>'+filters+'<details class="sheet-settings"><summary>Столбцы</summary><div class="sheet-column-options">'+Object.entries(SHEET_COLUMNS).map(([key,label])=>'<label><input type="checkbox" data-sheet-column="'+key+'" '+(cols.includes(key)?'checked':'')+'> '+label+'</label>').join('')+'</div></details><div class="sheet-scroll" tabindex="0" role="region" aria-label="Таблица будущих мероприятий"><table class="event-sheet" style="width:'+cols.reduce((n,k)=>n+sheetWidth(k),0)+'px"><colgroup>'+cols.map(k=>'<col data-sheet-col="'+k+'" style="width:'+sheetWidth(k)+'px">').join('')+'</colgroup><thead><tr>'+cols.map(key=>'<th scope="col" data-sheet-header="'+key+'"><button type="button" class="sheet-drag" data-sheet-drag="'+key+'" title="Перетащить; Alt + стрелки — порядок" aria-label="Переместить столбец '+SHEET_COLUMNS[key]+'"><span aria-hidden="true">⠿</span> '+SHEET_COLUMNS[key]+'</button><span class="sheet-resize" data-sheet-resize="'+key+'" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Ширина: '+SHEET_COLUMNS[key]+'" aria-valuemin="120" aria-valuemax="900" aria-valuenow="'+sheetWidth(key)+'"></span></th>').join('')+'</tr></thead><tbody id="sheet-body">'+sheetBody(rows,cols)+'</tbody></table></div>';
+}
+function reorderSheetColumn(key,target,after=false) {
+  const cols=sheetColumns(); if(key===target||!cols.includes(key)||!cols.includes(target)) return;
+  const next=cols.filter(k=>k!==key); next.splice(next.indexOf(target)+(after?1:0),0,key);
+  localStorage.setItem('zk.sheet-columns:'+state.scope,JSON.stringify(next)); render();
+  document.querySelector('[data-sheet-drag="'+key+'"]')?.focus();
+}
+function resizeSheetColumn(key,width,save=false) {
+  const value=Math.round(Math.max(120,Math.min(900,width))), table=document.querySelector('.event-sheet');
+  const col=document.querySelector('[data-sheet-col="'+key+'"]');
+  if(!col||!table) return;
+  col.style.width=value+'px';
+  document.querySelector('[data-sheet-resize="'+key+'"]').setAttribute('aria-valuenow',String(value));
+  table.style.width=[...table.querySelectorAll('col')].reduce((n,c)=>n+parseFloat(c.style.width),0)+'px';
+  if(save) { const widths=sheetWidths(); widths[key]=value; localStorage.setItem('zk.sheet-widths:'+state.scope,JSON.stringify(widths)); scheduleChecklistFit(table); }
+}
+let sheetPointer=null;
+document.addEventListener('pointerdown',e=>{
+  if(e.button!==0) return;
+  const handle=e.target.closest('[data-sheet-resize], [data-sheet-drag]');
+  if(!handle) return;
+  const key=handle.dataset.sheetResize||handle.dataset.sheetDrag;
+  sheetPointer={key,resize:!!handle.dataset.sheetResize,startX:e.clientX,width:sheetWidth(key),handle,moved:false};
+  handle.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+document.addEventListener('pointermove',e=>{
+  if(!sheetPointer) return;
+  const p=sheetPointer;
+  if(p.resize) resizeSheetColumn(p.key,p.width+e.clientX-p.startX);
+  else if(Math.abs(e.clientX-p.startX)>8) {
+    p.moved=true; p.handle.classList.add('is-dragging');
+    document.querySelectorAll('.sheet-drop-target').forEach(el=>el.classList.remove('sheet-drop-target'));
+    document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-sheet-header]')?.classList.add('sheet-drop-target');
+  }
+});
+function finishSheetPointer(e,cancel=false) {
+  if(!sheetPointer) return;
+  const p=sheetPointer; sheetPointer=null;
+  p.handle.classList.remove('is-dragging');
+  document.querySelectorAll('.sheet-drop-target').forEach(el=>el.classList.remove('sheet-drop-target'));
+  if(cancel) { if(p.resize) resizeSheetColumn(p.key,p.width); return; }
+  if(p.resize) resizeSheetColumn(p.key,p.width+e.clientX-p.startX,true);
+  else if(p.moved) {
+    const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-sheet-header]');
+    if(target) reorderSheetColumn(p.key,target.dataset.sheetHeader,e.clientX>target.getBoundingClientRect().left+target.getBoundingClientRect().width/2);
+  }
+}
+document.addEventListener('pointerup',e=>finishSheetPointer(e));
+document.addEventListener('pointercancel',e=>finishSheetPointer(e,true));
+document.addEventListener('keydown',e=>{
+  const resize=e.target.closest('[data-sheet-resize]'), drag=e.target.closest('[data-sheet-drag]');
+  if(resize&&['ArrowLeft','ArrowRight'].includes(e.key)) {
+    e.preventDefault(); resizeSheetColumn(resize.dataset.sheetResize,Number(resize.getAttribute('aria-valuenow'))+(e.key==='ArrowRight'?20:-20),true);
+  } else if(drag&&e.altKey&&['ArrowLeft','ArrowRight'].includes(e.key)) {
+    e.preventDefault(); const cols=sheetColumns(), index=cols.indexOf(drag.dataset.sheetDrag), next=index+(e.key==='ArrowRight'?1:-1);
+    if(cols[next]) reorderSheetColumn(drag.dataset.sheetDrag,cols[next],next>index);
+  }
+});
+
 
 function eventRow(r) {
   const { source: s, body: b } = r.payload, p = progress(b);
@@ -600,6 +684,7 @@ document.addEventListener('click', safeAction(async e => {
     const block = $(preparation ? '#preparation-contents' : '#discussion-contents'); block.open = !block.open;
     el.setAttribute('aria-expanded',String(block.open)); el.querySelector('span').textContent = block.open ? (preparation ? 'Скрыть задачи' : 'Скрыть вопросы') : (preparation ? 'Показать задачи' : 'Показать вопросы'); return;
   }
+  if (action === 'sheet-reset-filters') { sheetFilters={query:'',status:'',from:'',to:''}; render(); return; }
   if (action === 'navigate') return navigate(el.dataset.route);
   if (action === 'close-modal') return closeModal();
   if (action === 'exit') return leave();
@@ -668,6 +753,7 @@ document.addEventListener('click', safeAction(async e => {
 }));
 document.addEventListener('input', safeAction(async e => {
   const el = e.target;
+  if(el.dataset.sheetFilter) { sheetFilters[el.dataset.sheetFilter]=el.value; updateSheetRows(); return; }
   if (el.dataset.sheetField) {
     const r=record(el.dataset.record), key=el.dataset.sheetField;
     if(r?.kind!=='event'||!['customer','venue','totalCost','prepayment','team'].includes(key)) return;

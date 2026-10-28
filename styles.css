@@ -713,3 +713,16 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 .event-sheet textarea { resize: none; overflow-y: hidden; }
 .sheet-links { font-size: 13px; overflow-wrap: anywhere; margin-top: 4px; }
 @media (pointer: coarse) { .sheet-column-options label { min-height: 44px; } .event-sheet input, .event-sheet textarea { min-height: 44px; } }
+
+.sheet-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-bottom: 10px; }
+.sheet-filters label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); flex: 1 1 140px; }
+.sheet-filters label:first-child { flex-basis: 240px; }
+.event-sheet { table-layout: fixed; }
+.event-sheet th, .event-sheet td { min-width: 0; overflow-wrap: anywhere; }
+.event-sheet th { padding: 0; }
+.event-sheet input, .event-sheet textarea { min-width: 0; }
+.sheet-drag { display: block; width: 100%; border: 0; border-radius: 0; padding: 12px 16px 12px 10px; background: transparent; font: inherit; font-weight: 600; text-align: left; white-space: normal; cursor: grab; touch-action: none; }
+.sheet-drag.is-dragging { opacity: .55; cursor: grabbing; }
+.sheet-resize { position: absolute; right: 0; top: 0; bottom: 0; width: 12px; cursor: col-resize; touch-action: none; border-right: 2px solid #b8c3b1; }
+.sheet-resize:hover, .sheet-resize:focus-visible { background: #d9e4d2; outline: 2px solid #405d4c; outline-offset: -2px; }
+.event-sheet th.sheet-drop-target { box-shadow: inset 3px 0 #405d4c; background: #dce8d5; }
