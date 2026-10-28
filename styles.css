@@ -665,6 +665,11 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 .eyebrow, .subtitle, .form-help, .section-label { display: none !important; }
 .event-quick-info { margin-bottom: 16px; padding: 18px 22px; }
 .event-quick-info > h2 { margin: 0; font-size: 16px; }
+.event-quick-layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(240px, 1fr); gap: 18px; align-items: stretch; }
+.event-quick-fields { min-width: 0; }
+.calendar-summary { min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft, #f8f8f4); }
+.calendar-summary h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.calendar-summary .plain-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); font-size: 14px; line-height: 1.45; }
 .event-info-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 16px; margin: 12px 0; }
 .event-info-grid div { min-width: 0; }
 .event-info-grid dt { color: var(--muted); font-size: 13px; }
@@ -686,4 +691,4 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
   .upcoming-list .event-preview { flex: 0 0 210px; }
   .upcoming-list > .empty-state { flex: 1; }
 }
-@media (max-width: 600px) { .event-quick-info { padding: 16px; } .event-info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; } .event-cost-team { grid-template-columns: 1fr; gap: 10px; } }
+@media (max-width: 600px) { .event-quick-info { padding: 16px; } .event-quick-layout { grid-template-columns: 1fr; gap: 12px; } .calendar-summary { min-height: 0; } .event-info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; } .event-cost-team { grid-template-columns: 1fr; gap: 10px; } }
