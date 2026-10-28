@@ -212,5 +212,5 @@ test('demo data is synthetic, structurally valid and includes the wedding starte
   assert.ok(records.filter(x => x.kind === 'event').every(x => x.id.startsWith('event:demo-')));
   const templates = records.filter(x => x.kind === 'template');
   assert.deepEqual(templates.find(x => x.id === 'template:wedding').payload, defaultTemplates()[0].payload);
-  assert.ok(templates.filter(x => x.id !== 'template:wedding').every(x => !x.payload.questions.length && !x.payload.tasks.length));
+  assert.ok(templates.filter(x => !['template:wedding', 'template:corporate'].includes(x.id)).every(x => !x.payload.questions.length && !x.payload.tasks.length));
 });
