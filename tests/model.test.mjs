@@ -81,7 +81,9 @@ test('default wedding template is complete, independent and stable across calls'
   assert.ok([...wedding.payload.questions, ...wedding.payload.tasks].every(x =>
     x.id && x.label && x.section && x.hint && x.answer === '' && x.comment === '' && x.done === false));
   assert.deepEqual(first.map(x => x.payload), second.map(x => x.payload));
-  assert.ok(first.filter(x => x.id !== 'template:wedding').every(x => !x.payload.questions.length && !x.payload.tasks.length));
+  assert.ok(first.filter(x => !['template:wedding', 'template:corporate'].includes(x.id)).every(x => !x.payload.questions.length && !x.payload.tasks.length));
+  const corporate = first.find(x => x.id === 'template:corporate');
+  assert.ok(corporate.payload.questions.length > 0 && corporate.payload.tasks.length > 0);
   wedding.payload.questions[0].label = 'Моя правка';
   assert.notEqual(second[0].payload.questions[0].label, 'Моя правка');
   assert.notEqual(defaultTemplates()[0].payload.questions[0].label, 'Моя правка');
